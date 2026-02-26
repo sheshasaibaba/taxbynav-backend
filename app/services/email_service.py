@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 
 from app.core.config import settings
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -127,3 +128,24 @@ def send_appointment_confirmation_email(
         message=message,
     )
     _send_email_sync(to_email, subject, html)
+
+
+def send_admin_appointment_notification_email(
+    admin_email: str,
+    user: User,
+    slot_start_utc: datetime,
+    duration_minutes: int,
+    message: str | None = None,
+) -> None:
+    """
+    Notify admin when a new appointment is booked.
+    Reuses the same HTML template but makes it clear this is an admin copy.
+    """
+    subject = f"{settings.site_name} – New Appointment Booked"
+    html = build_appointment_confirmation_html(
+        recipient_name=_html_escape(user.full_name or user.email),
+        slot_start_utc=slot_start_utc,
+        duration_minutes=duration_minutes,
+        message=message,
+    )
+    _send_email_sync(admin_email, subject, html)

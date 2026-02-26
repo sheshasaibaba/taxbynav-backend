@@ -49,6 +49,63 @@ FastAPI backend with JWT auth, refresh tokens, Google SSO, and appointment booki
    - API: http://localhost:8000  
    - Docs: http://localhost:8000/docs  
 
+## Docker & Google Cloud Run
+
+The app runs in a container the same way as locally: **uvicorn** serves the API; **migrations** run on startup when `DATABASE_URL` is set. Cloud Run sets `PORT` (default 8080); the image uses it automatically.
+
+### Build and run locally with Docker
+
+From `taxbynav-backend/`:
+
+```bash
+docker build -t taxbynav-backend .
+docker run --rm -p 8080:8080 \
+  -e DATABASE_URL="postgresql://user:pass@host/db?sslmode=require" \
+  -e SECRET_KEY="your-secret-key" \
+  -e CORS_ORIGINS="http://localhost:3000" \
+  taxbynav-backend
+```
+
+- API: http://localhost:8080  
+- Add any other env vars (e.g. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, SMTP vars) as needed.
+
+### Deploy to Google Cloud Run
+
+1. **Build and push** (use your project ID and region):
+
+   ```bash
+   gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/taxbynav-backend
+   ```
+
+   Or with Artifact Registry:
+
+   ```bash
+   gcloud builds submit --tag REGION-docker.pkg.dev/YOUR_PROJECT_ID/REPO/taxbynav-backend
+   ```
+
+2. **Create or update the service** with required env vars (no `.env` file in the image; set them in Cloud Run):
+
+   - `DATABASE_URL` – PostgreSQL URL (e.g. Neon)
+   - `SECRET_KEY`
+   - `CORS_ORIGINS` – your frontend origin(s), e.g. `https://yourdomain.com`
+   - For Google SSO: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (use your Cloud Run URL, e.g. `https://your-service-xxx.run.app/api/v1/auth/google/callback`)
+   - Optional: SMTP vars, `APPOINTMENT_RETENTION_DAYS`, etc.
+
+   Example:
+
+   ```bash
+   gcloud run deploy taxbynav-backend \
+     --image gcr.io/YOUR_PROJECT_ID/taxbynav-backend \
+     --platform managed \
+     --region us-central1 \
+     --allow-unauthenticated \
+     --set-env-vars "DATABASE_URL=postgresql://...,SECRET_KEY=...,CORS_ORIGINS=https://yourdomain.com,GOOGLE_CLIENT_ID=...,GOOGLE_CLIENT_SECRET=...,GOOGLE_REDIRECT_URI=https://your-service-xxx.run.app/api/v1/auth/google/callback"
+   ```
+
+   For secrets (e.g. `SECRET_KEY`, `DATABASE_URL`), prefer [Secret Manager](https://cloud.google.com/run/docs/configuring/secrets) and reference them in the service.
+
+3. **Migrations** run automatically when the container starts (entrypoint runs `alembic upgrade head` before uvicorn). Ensure the database is reachable from Cloud Run (e.g. Neon allows public access with SSL).
+
 ## Google SSO – what you need
 
 To enable “Sign in with Google” you need a **Google OAuth 2.0 Client** and to point the backend at it.

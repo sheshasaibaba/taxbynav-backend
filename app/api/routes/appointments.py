@@ -7,14 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_session
 from app.api.schemas.appointment import BookAppointmentRequest
 from app.core.config import settings
-from app.models.appointment import Appointment, AppointmentCreate, AppointmentPublic
+from app.models.appointment import (
+    Appointment,
+    AppointmentAdminPublic,
+    AppointmentCreate,
+    AppointmentPublic,
+)
 from app.models.user import User
 from app.services.appointment_service import (
     cancel_appointment,
     create_appointment,
+    list_all_appointments_with_users,
     list_appointments_for_user,
 )
-from app.services.email_service import send_appointment_confirmation_email
+from app.services.email_service import (
+    send_admin_appointment_notification_email,
+    send_appointment_confirmation_email,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -45,6 +54,26 @@ def _to_public(a: Appointment) -> AppointmentPublic:
     )
 
 
+def _to_admin_public(a: Appointment, user: User) -> AppointmentAdminPublic:
+    """Public shape for admin listing with user details."""
+    aid = int(a.id) if a.id is not None else 0
+    slot = a.slot_start_utc or _FALLBACK_DATETIME
+    created = a.created_at or _FALLBACK_DATETIME
+    if isinstance(slot, datetime) and slot.tzinfo is not None:
+        slot = slot.replace(tzinfo=None)
+    if isinstance(created, datetime) and created.tzinfo is not None:
+        created = created.replace(tzinfo=None)
+    return AppointmentAdminPublic(
+        id=aid,
+        user_id=a.user_id,
+        user_email=user.email,
+        user_full_name=user.full_name,
+        slot_start_utc=slot,
+        message=a.message,
+        created_at=created,
+    )
+
+
 @router.post("", response_model=AppointmentPublic, status_code=status.HTTP_201_CREATED)
 async def book_appointment(
     body: BookAppointmentRequest,
@@ -68,6 +97,17 @@ async def book_appointment(
         duration_minutes=settings.slot_duration_minutes,
         message=appointment.message,
     )
+    # Notify admin of new booking (e.g. taxbynav@gmail.com)
+    admin_email = settings.from_email or settings.contact_email
+    if admin_email:
+        background_tasks.add_task(
+            send_admin_appointment_notification_email,
+            admin_email=admin_email,
+            user=current_user,
+            slot_start_utc=appointment.slot_start_utc,
+            duration_minutes=settings.slot_duration_minutes,
+            message=appointment.message,
+        )
     return _to_public(appointment)
 
 
@@ -82,6 +122,29 @@ async def list_my_appointments(
         return [_to_public(a) for a in appointments]
     except Exception as e:
         logger.exception("List appointments failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}") from e
+
+
+@router.get("/admin", response_model=list[AppointmentAdminPublic])
+async def list_all_appointments_admin(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> list[AppointmentAdminPublic]:
+    """
+    Admin endpoint: list all appointments with user details.
+    Only allowed for the admin email (taxbynav@gmail.com / settings.from_email).
+    """
+    admin_email = settings.from_email or settings.contact_email
+    if not admin_email or current_user.email.lower() != admin_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view all appointments",
+        )
+    try:
+        rows = await list_all_appointments_with_users(session)
+        return [_to_admin_public(a, u) for a, u in rows]
+    except Exception as e:
+        logger.exception("Admin list appointments failed: %s", e)
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}") from e
 
 

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.appointment import Appointment, AppointmentCreate
+from app.models.user import User
 from app.services.slot_service import get_booked_slot_starts, get_user_appointment_count_on_date
 
 
@@ -50,6 +51,23 @@ async def list_appointments_for_user(
         q = q.where(Appointment.slot_start_utc >= start)
     result = await session.execute(q)
     return list(result.scalars().all())
+
+
+async def list_all_appointments_with_users(
+    session: AsyncSession,
+) -> list[tuple[Appointment, User]]:
+    """
+    Return all appointments with their users for admin listing.
+    """
+    from sqlalchemy.orm import joinedload
+
+    q = (
+        select(Appointment, User)
+        .join(User, User.id == Appointment.user_id)
+        .order_by(Appointment.slot_start_utc)
+    )
+    result = await session.execute(q)
+    return list(result.all())
 
 
 async def cancel_appointment(session: AsyncSession, appointment_id: int, user_id: int) -> bool:

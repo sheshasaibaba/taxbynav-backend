@@ -1,0 +1,26 @@
+# Don't send secrets or local env into the image
+.env
+.env.*
+!.env.example
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.venv
+venv
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.egg-info
+.eggs
+dist
+build
+
+# Docs and dev-only (optional; keep if you want them in image)
+# docs/
+# backend-standards.md
+# tests/

@@ -27,3 +27,13 @@ class AppointmentPublic(SQLModel):
     slot_start_utc: datetime
     message: str | None = None
     created_at: datetime
+
+
+class AppointmentAdminPublic(SQLModel):
+    id: int
+    user_id: int
+    user_email: str
+    user_full_name: str | None = None
+    slot_start_utc: datetime
+    message: str | None = None
+    created_at: datetime
