@@ -35,6 +35,7 @@ async def create_appointment(
         user_id=user_id,
         slot_start_utc=slot_start,
         message=data.message,
+        contact_mode=data.contact_mode,
     )
     session.add(appointment)
     await session.flush()

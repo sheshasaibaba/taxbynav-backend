@@ -44,6 +44,7 @@ def build_appointment_confirmation_html(
     slot_start_utc: datetime,
     duration_minutes: int,
     message: str | None,
+    contact_mode: str | None = None,
 ) -> str:
     """Build HTML body for appointment confirmation."""
     # Format in a readable way (UTC; you can later add timezone conversion)
@@ -56,11 +57,19 @@ def build_appointment_confirmation_html(
     if settings.email_logo_url:
         logo_html = f'<img src="{settings.email_logo_url}" alt="{settings.site_name}" width="120" style="display:block;margin-bottom:24px;" />'
     message_section = ""
+    contact_mode_section = ""
     if message:
         safe_message = _html_escape(message)
         message_section = f"""
         <p style="margin:0 0 16px 0;color:#374151;"><strong>Your message:</strong></p>
         <p style="margin:0 0 24px 0;color:#6b7280;font-size:14px;">{safe_message}</p>
+        """
+    if contact_mode:
+        safe_mode = _html_escape(contact_mode)
+        contact_mode_section = f"""
+        <p style="margin:0 0 8px 0;font-size:14px;color:#374151;">
+          <strong>How this appointment will take place:</strong> {safe_mode}
+        </p>
         """
     return f"""
 <!DOCTYPE html>
@@ -91,6 +100,7 @@ def build_appointment_confirmation_html(
                 </tr>
               </table>
               {message_section}
+              {contact_mode_section}
               <p style="margin:0 0 8px 0;font-size:14px;color:#374151;">If you need to reschedule or cancel, please contact us.</p>
             </td>
           </tr>
@@ -118,6 +128,7 @@ def send_appointment_confirmation_email(
     slot_start_utc: datetime,
     duration_minutes: int,
     message: str | None = None,
+    contact_mode: str | None = None,
 ) -> None:
     """Compose and send appointment confirmation (call from background task)."""
     subject = f"{settings.site_name} – Appointment Confirmed"
@@ -126,6 +137,7 @@ def send_appointment_confirmation_email(
         slot_start_utc=slot_start_utc,
         duration_minutes=duration_minutes,
         message=message,
+        contact_mode=contact_mode,
     )
     _send_email_sync(to_email, subject, html)
 
@@ -136,6 +148,7 @@ def send_admin_appointment_notification_email(
     slot_start_utc: datetime,
     duration_minutes: int,
     message: str | None = None,
+    contact_mode: str | None = None,
 ) -> None:
     """
     Notify admin when a new appointment is booked.
@@ -147,5 +160,6 @@ def send_admin_appointment_notification_email(
         slot_start_utc=slot_start_utc,
         duration_minutes=duration_minutes,
         message=message,
+        contact_mode=contact_mode,
     )
     _send_email_sync(admin_email, subject, html)

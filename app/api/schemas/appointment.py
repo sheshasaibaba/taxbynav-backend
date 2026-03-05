@@ -16,3 +16,4 @@ class AvailableSlotsResponse(BaseModel):
 class BookAppointmentRequest(BaseModel):
     slot_start_utc: datetime
     message: str | None = None
+    contact_mode: str | None = None

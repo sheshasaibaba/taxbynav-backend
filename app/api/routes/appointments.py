@@ -50,6 +50,7 @@ def _to_public(a: Appointment) -> AppointmentPublic:
         user_id=a.user_id,
         slot_start_utc=slot,
         message=a.message,
+        contact_mode=a.contact_mode,
         created_at=created,
     )
 
@@ -70,6 +71,7 @@ def _to_admin_public(a: Appointment, user: User) -> AppointmentAdminPublic:
         user_full_name=user.full_name,
         slot_start_utc=slot,
         message=a.message,
+        contact_mode=a.contact_mode,
         created_at=created,
     )
 
@@ -81,7 +83,11 @@ async def book_appointment(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> AppointmentPublic:
-    data = AppointmentCreate(slot_start_utc=body.slot_start_utc, message=body.message)
+    data = AppointmentCreate(
+        slot_start_utc=body.slot_start_utc,
+        message=body.message,
+        contact_mode=body.contact_mode,
+    )
     appointment = await create_appointment(session, current_user.id, data)
     if not appointment:
         raise HTTPException(
@@ -97,8 +103,8 @@ async def book_appointment(
         duration_minutes=settings.slot_duration_minutes,
         message=appointment.message,
     )
-    # Notify admin of new booking (e.g. taxbynav@gmail.com)
-    admin_email = settings.from_email or settings.contact_email
+    # Notify admin of new booking (uses configured contact email if set)
+    admin_email = settings.contact_email or settings.from_email
     if admin_email:
         background_tasks.add_task(
             send_admin_appointment_notification_email,
@@ -107,6 +113,7 @@ async def book_appointment(
             slot_start_utc=appointment.slot_start_utc,
             duration_minutes=settings.slot_duration_minutes,
             message=appointment.message,
+            contact_mode=appointment.contact_mode,
         )
     return _to_public(appointment)
 
@@ -132,9 +139,9 @@ async def list_all_appointments_admin(
 ) -> list[AppointmentAdminPublic]:
     """
     Admin endpoint: list all appointments with user details.
-    Only allowed for the admin email (taxbynav@gmail.com / settings.from_email).
+    Only allowed for the admin email (TaxByNav contact email / from_email).
     """
-    admin_email = settings.from_email or settings.contact_email
+    admin_email = settings.contact_email or settings.from_email
     if not admin_email or current_user.email.lower() != admin_email.lower():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

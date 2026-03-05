@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = ""
 
+    # Google Places (reviews)
+    google_places_api: str = ""
+    google_places_id: str = ""
+
     # Slot/appointment business rules
     slot_duration_minutes: int = 30
     business_start_hour: int = 9

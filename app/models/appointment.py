@@ -13,12 +13,14 @@ class Appointment(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id", index=True)
     slot_start_utc: datetime = Field(unique=True, index=True)  # no overlapping slots
     message: str | None = None
+    contact_mode: str | None = Field(default=None, max_length=50)
     created_at: datetime = Field(default_factory=_utc_naive_now)
 
 
 class AppointmentCreate(SQLModel):
     slot_start_utc: datetime
     message: str | None = None
+    contact_mode: str | None = None
 
 
 class AppointmentPublic(SQLModel):
@@ -26,6 +28,7 @@ class AppointmentPublic(SQLModel):
     user_id: int
     slot_start_utc: datetime
     message: str | None = None
+    contact_mode: str | None = None
     created_at: datetime
 
 
@@ -36,4 +39,5 @@ class AppointmentAdminPublic(SQLModel):
     user_full_name: str | None = None
     slot_start_utc: datetime
     message: str | None = None
+    contact_mode: str | None = None
     created_at: datetime

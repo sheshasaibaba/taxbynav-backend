@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import auth, appointments, slots
+from app.api.routes import auth, appointments, slots, reviews
 from app.core.config import settings, _ENV_FILE
 from app.core.db import async_session_maker
 from app.services.appointment_service import delete_appointments_older_than
@@ -80,6 +80,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(slots.router, prefix="/api/v1")
 app.include_router(appointments.router, prefix="/api/v1")
+app.include_router(reviews.router, prefix="/api/v1")
 
 
 def _cors_headers(origin: str | None) -> dict[str, str]:
