@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -40,6 +40,23 @@ async def get_user_appointment_count_on_date(
     result = await session.execute(
         select(Appointment).where(
             Appointment.user_id == user_id,
+            Appointment.slot_start_utc >= start,
+            Appointment.slot_start_utc < end,
+        )
+    )
+    return len(result.scalars().all())
+
+
+async def get_guest_appointment_count_on_date(
+    session: AsyncSession, guest_email: str, d: date
+) -> int:
+    """Count appointments for this guest email on the given date (case-insensitive)."""
+    start = datetime(d.year, d.month, d.day, 0, 0, 0)
+    end = start + timedelta(days=1)
+    email_lower = guest_email.lower()
+    result = await session.execute(
+        select(Appointment).where(
+            func.lower(Appointment.guest_email) == email_lower,
             Appointment.slot_start_utc >= start,
             Appointment.slot_start_utc < end,
         )

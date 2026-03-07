@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -13,10 +13,21 @@ from app.core.security import (
 )
 from app.models.refresh_token import RefreshToken
 from app.models.user import User, UserCreate, UserPublic
+from app.services.appointment_service import link_guest_appointments_to_user
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     result = await session.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_email_insensitive(session: AsyncSession, email: str) -> User | None:
+    """Find user by email (case-insensitive)."""
+    if not email or not email.strip():
+        return None
+    result = await session.execute(
+        select(User).where(func.lower(User.email) == email.strip().lower())
+    )
     return result.scalar_one_or_none()
 
 
@@ -95,6 +106,7 @@ async def signup_user(
     user = await create_user(
         session, UserCreate(email=email, password=password, full_name=full_name)
     )
+    await link_guest_appointments_to_user(session, user.id, user.email)
     access, refresh, expires_in = make_token_pair(user.id)
     await store_refresh_token(session, user_id=user.id, refresh_token=refresh)
     return user, access, refresh, expires_in

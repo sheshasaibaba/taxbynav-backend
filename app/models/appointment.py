@@ -10,7 +10,9 @@ def _utc_naive_now() -> datetime:
 class Appointment(SQLModel, table=True):
     __tablename__ = "appointments"
     id: int | None = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: int | None = Field(default=None, foreign_key="users.id", index=True)
+    guest_email: str | None = Field(default=None, index=True)
+    guest_full_name: str | None = None
     slot_start_utc: datetime = Field(unique=True, index=True)  # no overlapping slots
     message: str | None = None
     contact_mode: str | None = Field(default=None, max_length=50)
@@ -25,7 +27,7 @@ class AppointmentCreate(SQLModel):
 
 class AppointmentPublic(SQLModel):
     id: int
-    user_id: int
+    user_id: int | None = None
     slot_start_utc: datetime
     message: str | None = None
     contact_mode: str | None = None
@@ -34,7 +36,7 @@ class AppointmentPublic(SQLModel):
 
 class AppointmentAdminPublic(SQLModel):
     id: int
-    user_id: int
+    user_id: int | None = None
     user_email: str
     user_full_name: str | None = None
     slot_start_utc: datetime

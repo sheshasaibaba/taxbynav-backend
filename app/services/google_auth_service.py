@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.user import User
+from app.services.appointment_service import link_guest_appointments_to_user
 
 logger = logging.getLogger(__name__)
 
@@ -93,4 +94,5 @@ async def get_or_create_google_user(
     session.add(user)
     await session.flush()
     await session.refresh(user)
+    await link_guest_appointments_to_user(session, user.id, user.email)
     return user
