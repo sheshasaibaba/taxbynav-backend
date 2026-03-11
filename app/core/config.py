@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # Slot/appointment business rules
     slot_duration_minutes: int = 30
     business_start_hour: int = 9
-    business_end_hour: int = 17  # exclusive, so last slot ends at 17:00
+    business_end_hour: int = 20  # exclusive, so last slot ends at 20:00 (8 PM)
     max_slots_per_user_per_day: int = 1
     # Delete appointments 3 days after booking so no excess data remains
     appointment_retention_days: int = 3
@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     @property
     def email_enabled(self) -> bool:
         return bool(self.smtp_host and self.smtp_user and self.smtp_password and self.from_email)
+
+    @property
+    def admin_email_for_auth(self) -> str:
+        """Email that is allowed to use admin appointment endpoints. Uses SMTP_USER (same as sending account)."""
+        return (self.smtp_user or "").strip()
 
 
 settings = Settings()

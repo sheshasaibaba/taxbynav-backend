@@ -89,7 +89,7 @@ docker run --rm -p 8080:8080 \
    - `SECRET_KEY`
    - `CORS_ORIGINS` – your frontend origin(s), e.g. `https://yourdomain.com`
    - For Google SSO: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (use your Cloud Run URL, e.g. `https://your-service-xxx.run.app/api/v1/auth/google/callback`)
-   - Optional: SMTP vars, `APPOINTMENT_RETENTION_DAYS`, etc.
+   - Optional: SMTP vars, `APPOINTMENT_RETENTION_DAYS`, etc. The `SMTP_USER` email is used for admin appointment access (view all, book for others).
 
    Example:
 

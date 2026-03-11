@@ -111,8 +111,8 @@ async def book_appointment(
         message=appointment.message,
         contact_mode=appointment.contact_mode,
     )
-    # Notify admin of new booking (uses configured contact email if set)
-    admin_email = settings.contact_email or settings.from_email
+    # Notify admin of new booking
+    admin_email = settings.admin_email_for_auth
     if admin_email:
         background_tasks.add_task(
             send_admin_appointment_notification_email,
@@ -160,7 +160,7 @@ async def admin_book_appointment(
     If not, a guest booking is created; when they register with that email later,
     the appointment will appear under their account.
     """
-    admin_email = settings.contact_email or settings.from_email
+    admin_email = settings.admin_email_for_auth
     if not admin_email or current_user.email.lower() != admin_email.lower():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -198,7 +198,7 @@ async def admin_book_appointment(
             message=appointment.message,
             contact_mode=appointment.contact_mode,
         )
-    admin_email_to = settings.contact_email or settings.from_email
+    admin_email_to = settings.admin_email_for_auth
     if admin_email_to:
         background_tasks.add_task(
             send_admin_appointment_notification_email,
@@ -223,7 +223,7 @@ async def list_all_appointments_admin(
     Admin endpoint: list all appointments with user details.
     Only allowed for the admin email (TaxByNav contact email / from_email).
     """
-    admin_email = settings.contact_email or settings.from_email
+    admin_email = settings.admin_email_for_auth
     if not admin_email or current_user.email.lower() != admin_email.lower():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -28,3 +28,4 @@ class UserPublic(SQLModel):
     email: str
     full_name: str | None = None
     is_google_account: bool
+    is_admin: bool = False

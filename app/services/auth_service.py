@@ -16,6 +16,17 @@ from app.models.user import User, UserCreate, UserPublic
 from app.services.appointment_service import link_guest_appointments_to_user
 
 
+def user_to_public(user: User) -> UserPublic:
+    admin_email = settings.admin_email_for_auth
+    return UserPublic(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        is_google_account=user.is_google_account,
+        is_admin=bool(admin_email and user.email.lower() == admin_email.lower()),
+    )
+
+
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     result = await session.execute(select(User).where(User.email == email))
     return result.scalar_one_or_none()
@@ -44,13 +55,6 @@ async def create_user(session: AsyncSession, data: UserCreate) -> User:
     return user
 
 
-def user_to_public(user: User) -> UserPublic:
-    return UserPublic(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        is_google_account=user.is_google_account,
-    )
 
 
 def make_token_pair(user_id: int) -> tuple[str, str, int]:
