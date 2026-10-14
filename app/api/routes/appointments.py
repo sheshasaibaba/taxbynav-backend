@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from app.api.deps import get_current_admin_user, get_current_user, get_optional_user, get_session
 from app.api.schemas.appointment import (
@@ -47,10 +47,10 @@ def _to_public(a: Appointment) -> AppointmentPublic:
     aid = int(a.id) if a.id is not None else 0
     slot = a.slot_start_utc or _FALLBACK_DATETIME
     created = a.created_at or _FALLBACK_DATETIME
-    if isinstance(slot, datetime) and slot.tzinfo is not None:
-        slot = slot.replace(tzinfo=None)
-    if isinstance(created, datetime) and created.tzinfo is not None:
-        created = created.replace(tzinfo=None)
+    if isinstance(slot, datetime) and slot.tzinfo is None:
+        slot = slot.replace(tzinfo=UTC)
+    if isinstance(created, datetime) and created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
     return AppointmentPublic(
         id=aid,
         user_id=a.user_id,
@@ -68,10 +68,10 @@ def _to_admin_public(a: Appointment, user: User | None) -> AppointmentAdminPubli
     aid = int(a.id) if a.id is not None else 0
     slot = a.slot_start_utc or _FALLBACK_DATETIME
     created = a.created_at or _FALLBACK_DATETIME
-    if isinstance(slot, datetime) and slot.tzinfo is not None:
-        slot = slot.replace(tzinfo=None)
-    if isinstance(created, datetime) and created.tzinfo is not None:
-        created = created.replace(tzinfo=None)
+    if isinstance(slot, datetime) and slot.tzinfo is None:
+        slot = slot.replace(tzinfo=UTC)
+    if isinstance(created, datetime) and created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
     if user is not None:
         email, full_name = user.email, user.full_name
     else:

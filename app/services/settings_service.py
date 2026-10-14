@@ -7,8 +7,8 @@ from app.core.config import settings as app_settings
 from app.models.setting import SiteSettings, SiteSettingsUpdate
 
 
-def _utc_naive_now() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 async def get_or_create_settings(session: AsyncSession) -> SiteSettings:
@@ -31,7 +31,7 @@ async def get_or_create_settings(session: AsyncSession) -> SiteSettings:
         contact_phone=app_settings.contact_phone,
         contact_email=app_settings.contact_email,
         map_url="https://maps.app.goo.gl/U6UWUMCzqQNeqXTs6?g_st=ic",
-        updated_at=_utc_naive_now(),
+        updated_at=_utc_now(),
     )
     session.add(item)
     await session.flush()
@@ -46,7 +46,7 @@ async def update_settings(session: AsyncSession, data: SiteSettingsUpdate) -> Si
     for field, val in updates.items():
         if val is not None:
             setattr(item, field, val)
-    item.updated_at = _utc_naive_now()
+    item.updated_at = _utc_now()
     session.add(item)
     await session.flush()
     await session.refresh(item)

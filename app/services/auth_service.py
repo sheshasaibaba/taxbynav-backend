@@ -62,23 +62,16 @@ def make_token_pair(user_id: int) -> tuple[str, str, int]:
     return access, refresh, expires_in
 
 
-def _utc_naive() -> datetime:
-    """Naive UTC datetime for DB columns that are TIMESTAMP WITHOUT TIME ZONE."""
-    return datetime.now(UTC).replace(tzinfo=None)
-
-
-def _naive_utc(dt: datetime) -> datetime:
-    """Ensure datetime is naive UTC for DB (strip or convert to UTC and strip)."""
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(UTC)
-    return dt.replace(tzinfo=None)
+def _utc_now() -> datetime:
+    """Current UTC datetime."""
+    return datetime.now(UTC)
 
 
 async def store_refresh_token(session: AsyncSession, user_id: int, refresh_token: str) -> None:
     user_id_str, jti = decode_refresh_token(refresh_token)
     if not user_id_str or not jti:
         return
-    expires_at = _naive_utc(datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days))
+    expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
     token_row = RefreshToken(user_id=user_id, jti=jti, expires_at=expires_at)
     session.add(token_row)
     await session.flush()
@@ -131,7 +124,7 @@ async def refresh_tokens(
         select(RefreshToken).where(
             RefreshToken.jti == jti,
             RefreshToken.revoked == False,  # noqa: E712
-            RefreshToken.expires_at > _utc_naive(),
+            RefreshToken.expires_at > _utc_now(),
         )
     )
     token_row = result.scalar_one_or_none()

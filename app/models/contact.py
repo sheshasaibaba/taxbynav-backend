@@ -3,9 +3,8 @@ from datetime import UTC, datetime
 from sqlmodel import Field, SQLModel
 
 
-def _utc_naive_now() -> datetime:
-    """Naive UTC for TIMESTAMP WITHOUT TIME ZONE columns."""
-    return datetime.now(UTC).replace(tzinfo=None)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class ContactInquiry(SQLModel, table=True):
@@ -17,7 +16,11 @@ class ContactInquiry(SQLModel, table=True):
     subject: str = Field(max_length=255)
     message: str
     status: str = Field(default="new", max_length=50)  # new, read, resolved
-    created_at: datetime = Field(default_factory=_utc_naive_now)
+    created_at: datetime = Field(default_factory=_utc_now)
+
+    def model_post_init(self, __context: object) -> None:
+        if self.created_at is not None and self.created_at.tzinfo is None:
+            self.created_at = self.created_at.replace(tzinfo=UTC)
 
 
 class ContactInquiryCreate(SQLModel):

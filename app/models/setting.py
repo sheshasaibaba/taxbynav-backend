@@ -3,9 +3,8 @@ from datetime import UTC, datetime
 from sqlmodel import Field, SQLModel
 
 
-def _utc_naive_now() -> datetime:
-    """Naive UTC for TIMESTAMP WITHOUT TIME ZONE columns."""
-    return datetime.now(UTC).replace(tzinfo=None)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class SiteSettings(SQLModel, table=True):
@@ -26,7 +25,11 @@ class SiteSettings(SQLModel, table=True):
     contact_phone: str = Field(default="306-381-4864")
     contact_email: str = Field(default="jattanaservices@outlook.com")
     map_url: str = Field(default="https://maps.app.goo.gl/U6UWUMCzqQNeqXTs6?g_st=ic")
-    updated_at: datetime = Field(default_factory=_utc_naive_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
+
+    def model_post_init(self, __context: object) -> None:
+        if self.updated_at is not None and self.updated_at.tzinfo is None:
+            self.updated_at = self.updated_at.replace(tzinfo=UTC)
 
 
 class SiteSettingsPublic(SQLModel):

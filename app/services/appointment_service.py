@@ -249,13 +249,13 @@ async def cancel_appointment(
     return True
 
 
-def _utc_naive_now() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 async def delete_appointments_older_than(session: AsyncSession, days: int) -> int:
     """Delete appointments older than `days` ago (by slot_start_utc). Returns count deleted."""
-    cutoff = _utc_naive_now() - timedelta(days=days)
+    cutoff = _utc_now() - timedelta(days=days)
     result = await session.execute(delete(Appointment).where(Appointment.slot_start_utc < cutoff))
     await session.flush()
     return result.rowcount or 0

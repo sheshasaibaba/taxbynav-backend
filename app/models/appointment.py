@@ -3,9 +3,8 @@ from datetime import UTC, datetime
 from sqlmodel import Field, SQLModel
 
 
-def _utc_naive_now() -> datetime:
-    """Naive UTC for TIMESTAMP WITHOUT TIME ZONE columns."""
-    return datetime.now(UTC).replace(tzinfo=None)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class Appointment(SQLModel, table=True):
@@ -22,7 +21,13 @@ class Appointment(SQLModel, table=True):
     status: str = Field(
         default="scheduled", max_length=50
     )  # scheduled, rescheduled, completed, cancelled, no_show
-    created_at: datetime = Field(default_factory=_utc_naive_now)
+    created_at: datetime = Field(default_factory=_utc_now)
+
+    def model_post_init(self, __context: object) -> None:
+        if self.slot_start_utc is not None and self.slot_start_utc.tzinfo is None:
+            self.slot_start_utc = self.slot_start_utc.replace(tzinfo=UTC)
+        if self.created_at is not None and self.created_at.tzinfo is None:
+            self.created_at = self.created_at.replace(tzinfo=UTC)
 
 
 class AppointmentCreate(SQLModel):

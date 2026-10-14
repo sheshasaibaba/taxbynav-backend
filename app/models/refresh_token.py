@@ -3,11 +3,11 @@ from datetime import UTC, datetime
 from sqlmodel import Field, SQLModel
 
 
-def _naive_utc(dt: datetime) -> datetime:
-    """For TIMESTAMP WITHOUT TIME ZONE: store as naive UTC."""
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(UTC)
-    return dt.replace(tzinfo=None)
+def _ensure_utc(dt: datetime) -> datetime:
+    """Ensure datetime has UTC timezone for asyncpg TIMESTAMPTZ."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 class RefreshToken(SQLModel, table=True):
@@ -19,9 +19,9 @@ class RefreshToken(SQLModel, table=True):
     revoked: bool = False
 
     def model_post_init(self, __context: object) -> None:
-        """Ensure expires_at is naive UTC for asyncpg TIMESTAMP WITHOUT TIME ZONE."""
+        """Ensure expires_at has UTC tzinfo for asyncpg TIMESTAMP WITH TIME ZONE."""
         if self.expires_at is not None:
-            self.expires_at = _naive_utc(self.expires_at)
+            self.expires_at = _ensure_utc(self.expires_at)
 
 
 class RefreshTokenCreate(SQLModel):

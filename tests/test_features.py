@@ -73,9 +73,9 @@ def test_dynamic_slot_generation_cst():
     slots = _slot_times_for_date_cst(d_thurs, settings)
     assert len(slots) == 4
     # First slot should be 9:00 AM CST which is 15:00 UTC
-    assert slots[0] == datetime(2026, 10, 15, 15, 0, 0)
+    assert slots[0] == datetime(2026, 10, 15, 15, 0, 0, tzinfo=UTC)
     # Last slot should be 10:30 AM CST which is 16:30 UTC
-    assert slots[-1] == datetime(2026, 10, 15, 16, 30, 0)
+    assert slots[-1] == datetime(2026, 10, 15, 16, 30, 0, tzinfo=UTC)
 
     # Friday, Oct 16 2026 (in blackout dates)
     d_fri = date(2026, 10, 16)

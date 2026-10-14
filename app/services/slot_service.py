@@ -51,8 +51,8 @@ def _slot_times_for_date_cst(d: date, site_settings: SiteSettings) -> list[datet
 
     current_cst = start_cst
     while current_cst < end_cst:
-        # Convert each slot start to naive UTC
-        slot_utc = current_cst.astimezone(UTC_TZ).replace(tzinfo=None)
+        # Convert each slot start to aware UTC
+        slot_utc = current_cst.astimezone(UTC_TZ)
         slots_utc.append(slot_utc)
         current_cst += delta
 
@@ -62,10 +62,12 @@ def _slot_times_for_date_cst(d: date, site_settings: SiteSettings) -> list[datet
 async def get_booked_slot_starts(
     session: AsyncSession, start_inclusive: datetime, end_exclusive: datetime
 ) -> set[datetime]:
+    start_dt = start_inclusive if start_inclusive.tzinfo is not None else start_inclusive.replace(tzinfo=UTC_TZ)
+    end_dt = end_exclusive if end_exclusive.tzinfo is not None else end_exclusive.replace(tzinfo=UTC_TZ)
     result = await session.execute(
         select(Appointment.slot_start_utc).where(
-            Appointment.slot_start_utc >= start_inclusive,
-            Appointment.slot_start_utc < end_exclusive,
+            Appointment.slot_start_utc >= start_dt,
+            Appointment.slot_start_utc < end_dt,
             Appointment.status != "cancelled",  # Cancelled appointments free up their slot!
         )
     )
@@ -77,8 +79,8 @@ def _get_cst_day_utc_bounds(d: date) -> tuple[datetime, datetime]:
     start_cst = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=SASKATOON_TZ)
     end_cst = start_cst + timedelta(days=1)
     return (
-        start_cst.astimezone(UTC_TZ).replace(tzinfo=None),
-        end_cst.astimezone(UTC_TZ).replace(tzinfo=None),
+        start_cst.astimezone(UTC_TZ),
+        end_cst.astimezone(UTC_TZ),
     )
 
 

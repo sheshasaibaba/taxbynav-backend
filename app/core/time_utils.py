@@ -13,10 +13,8 @@ def ensure_utc(dt: datetime) -> datetime:
 
 
 def to_naive_utc(dt: datetime) -> datetime:
-    """Convert any datetime to naive UTC."""
-    if dt.tzinfo is not None:
-        return dt.astimezone(UTC_TZ).replace(tzinfo=None)
-    return dt
+    """Ensure datetime is in aware UTC for asyncpg TIMESTAMPTZ."""
+    return ensure_utc(dt)
 
 
 def to_saskatoon_cst(dt: datetime) -> datetime:
