@@ -9,7 +9,7 @@ from app.core.config import settings
 # Use asyncpg for async FastAPI. asyncpg does not accept psycopg params like sslmode/channel_binding.
 # Convert scheme and strip incompatible query params; SSL is enabled via connect_args.
 parsed = urlparse(settings.database_url)
-scheme = "postgresql+asyncpg" if parsed.scheme == "postgresql" else parsed.scheme
+scheme = "postgresql+asyncpg" if parsed.scheme in ("postgresql", "postgres") else parsed.scheme
 query = parse_qs(parsed.query, keep_blank_values=True)
 query.pop("sslmode", None)
 query.pop("channel_binding", None)

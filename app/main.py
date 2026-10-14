@@ -56,9 +56,23 @@ async def _run_appointment_cleanup() -> None:
         logger.exception("Appointment cleanup failed: %s", e)
 
 
+def _run_migrations() -> None:
+    """Apply Alembic migrations to ensure all tables and columns exist in PostgreSQL."""
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations executed successfully.")
+    except Exception as e:
+        logger.warning("Database migration startup warning: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: run cleanup once
+    # Startup: apply migrations and run initial cleanup
+    _run_migrations()
     await _run_appointment_cleanup()
     # Background: run every 24h
     task = asyncio.create_task(_cleanup_loop())
@@ -153,7 +167,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handle unhandled exceptions cleanly without leaking internal Python syntax or tracebacks."""
+    """Handle unhandled exceptions cleanly while exposing the actual error detail for diagnosis."""
     origin = request.headers.get("origin")
     headers = _cors_headers(origin)
     if isinstance(exc, HTTPException):
@@ -166,10 +180,10 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     # Log full traceback internally for operations
     logger.exception("Unhandled server exception: %s", exc)
 
-    # Return friendly, human message to client
+    err_detail = f"{type(exc).__name__}: {str(exc)}"
     return JSONResponse(
         status_code=500,
-        content={"detail": "An unexpected error occurred while processing your request. Please try again or contact support."},
+        content={"detail": err_detail},
         headers=headers,
     )
 

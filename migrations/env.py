@@ -14,12 +14,21 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.database_url)
+def _get_sync_db_url() -> str:
+    url = settings.database_url
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    elif url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    return url
+
+
+config.set_main_option("sqlalchemy.url", _get_sync_db_url())
 target_metadata = SQLModel.metadata
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = _get_sync_db_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -31,7 +40,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = create_engine(settings.database_url)
+    sync_url = _get_sync_db_url()
+    connectable = create_engine(sync_url)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
