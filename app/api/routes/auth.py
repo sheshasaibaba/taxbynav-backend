@@ -3,12 +3,6 @@ import logging
 from urllib.parse import urlencode
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.config import settings
-
 from app.api.deps import get_current_user, refresh_header
 from app.api.schemas.auth import (
     LoginRequest,
@@ -16,14 +10,15 @@ from app.api.schemas.auth import (
     SignupRequest,
     TokenPair,
 )
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.security import decode_refresh_token
 from app.models.user import User, UserPublic
 from app.services.auth_service import (
     login_user,
-    signup_user,
     refresh_tokens,
     revoke_refresh_token,
+    signup_user,
     user_to_public,
 )
 from app.services.google_auth_service import (
@@ -32,6 +27,9 @@ from app.services.google_auth_service import (
     get_google_user_info,
     get_or_create_google_user,
 )
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +61,7 @@ async def signup(
     session: AsyncSession = Depends(get_session),
 ) -> TokenPair:
     full_name = body.full_name or body.name
-    pair = await signup_user(
-        session, body.email, body.password, full_name
-    )
+    pair = await signup_user(session, body.email, body.password, full_name)
     if not pair:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -125,6 +121,7 @@ async def me(current_user: User = Depends(get_current_user)) -> UserPublic:
 
 
 # --- Google SSO ---
+
 
 def _is_allowed_redirect_uri(redirect_uri: str) -> bool:
     """Allow only redirect URIs under configured CORS origins."""
@@ -209,11 +206,13 @@ async def google_callback(
         logger.info("Google callback: step 5 redirect")
         frontend_redirect = _decode_redirect_uri(state)
         if frontend_redirect:
-            fragment = urlencode({
-                "access_token": access,
-                "refresh_token": refresh,
-                "expires_in": str(expires_in),
-            })
+            fragment = urlencode(
+                {
+                    "access_token": access,
+                    "refresh_token": refresh,
+                    "expires_in": str(expires_in),
+                }
+            )
             return RedirectResponse(url=f"{frontend_redirect}#{fragment}", status_code=302)
 
         return TokenPair(

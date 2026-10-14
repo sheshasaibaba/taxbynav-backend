@@ -1,6 +1,5 @@
-from fastapi import APIRouter, HTTPException
-
 from app.services.reviews_service import get_google_reviews
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(tags=["reviews"])
 
@@ -14,4 +13,4 @@ async def reviews():
         raise HTTPException(
             status_code=502,
             detail=f"Could not fetch Google reviews: {exc}",
-        )
+        ) from exc

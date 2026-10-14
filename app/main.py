@@ -1,14 +1,23 @@
 import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import auth, appointments, slots, reviews
-from app.core.config import settings, _ENV_FILE
+from app.api.routes import (
+    appointments,
+    auth,
+    contact,
+    reviews,
+    slots,
+)
+from app.api.routes import (
+    settings as settings_routes,
+)
+from app.core.config import _ENV_FILE, settings
 from app.core.db import async_session_maker
 from app.services.appointment_service import delete_appointments_older_than
 
@@ -25,14 +34,20 @@ CLEANUP_INTERVAL_SECONDS = 24 * 60 * 60  # 24 hours
 
 
 async def _run_appointment_cleanup() -> None:
-    """Delete appointments older than appointment_retention_days (e.g. 3 days after booking)."""
+    """Delete appointments older than appointment_retention_days (by slot_start_utc)."""
     try:
         async with async_session_maker() as session:
             try:
-                n = await delete_appointments_older_than(session, settings.appointment_retention_days)
+                n = await delete_appointments_older_than(
+                    session, settings.appointment_retention_days
+                )
                 await session.commit()
                 if n:
-                    logger.info("Appointment cleanup: deleted %d record(s) older than %d days", n, settings.appointment_retention_days)
+                    logger.info(
+                        "Appointment cleanup: deleted %d record(s) older than %d days",
+                        n,
+                        settings.appointment_retention_days,
+                    )
             except Exception:
                 await session.rollback()
                 raise
@@ -48,10 +63,8 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(_cleanup_loop())
     yield
     task.cancel()
-    try:
+    with suppress(asyncio.CancelledError):
         await task
-    except asyncio.CancelledError:
-        pass
 
 
 async def _cleanup_loop() -> None:
@@ -62,8 +75,8 @@ async def _cleanup_loop() -> None:
 
 app = FastAPI(
     title="TaxByNav API",
-    description="Backend for TaxByNav: auth, slots, appointments",
-    version="0.1.0",
+    description="Backend for TaxByNav: auth, slots, appointments, settings, and contact",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -81,6 +94,8 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(slots.router, prefix="/api/v1")
 app.include_router(appointments.router, prefix="/api/v1")
 app.include_router(reviews.router, prefix="/api/v1")
+app.include_router(settings_routes.router, prefix="/api/v1")
+app.include_router(contact.router, prefix="/api/v1")
 
 
 def _cors_headers(origin: str | None) -> dict[str, str]:
@@ -120,7 +135,10 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 @app.on_event("startup")
 def startup_log() -> None:
     logger.info("Loading .env from: %s (exists: %s)", _ENV_FILE, _ENV_FILE.exists())
-    logger.info("Appointment retention: %d days (cleanup on startup and every 24h)", settings.appointment_retention_days)
+    logger.info(
+        "Appointment retention: %d days (cleanup on startup and every 24h)",
+        settings.appointment_retention_days,
+    )
     if settings.google_client_id and settings.google_redirect_uri:
         logger.info("Google OAuth: configured (GOOGLE_CLIENT_ID set)")
     else:

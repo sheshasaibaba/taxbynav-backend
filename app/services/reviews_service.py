@@ -2,6 +2,7 @@
 Fetches Google Place reviews via the Places Details API and caches the result
 in-memory for CACHE_TTL seconds so we don't burn API quota on every page load.
 """
+
 import logging
 import time
 from typing import Any

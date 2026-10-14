@@ -3,6 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.db import get_session
 from app.core.security import decode_access_token
 from app.models.user import User
@@ -11,7 +12,9 @@ security = HTTPBearer(auto_error=False)
 optional_bearer = HTTPBearer(auto_error=False)
 
 
-def refresh_header(x_refresh_token: str | None = Header(default=None, alias="X-Refresh-Token")) -> str | None:
+def refresh_header(
+    x_refresh_token: str | None = Header(default=None, alias="X-Refresh-Token"),
+) -> str | None:
     """Extract X-Refresh-Token header for logout/refresh endpoints."""
     return x_refresh_token
 
@@ -40,7 +43,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
     result = await session.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
@@ -67,3 +70,16 @@ async def get_optional_user(
         return None
     result = await session.execute(select(User).where(User.id == uid))
     return result.scalar_one_or_none()
+
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Ensure current user has admin access based on settings.admin_email_for_auth."""
+    admin_email = settings.admin_email_for_auth
+    if not admin_email or current_user.email.lower() != admin_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privilege required",
+        )
+    return current_user

@@ -1,14 +1,14 @@
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Connection
-
-from sqlmodel import SQLModel
 from app.core.config import settings
-from app.models.user import User  # noqa: F401 - register table
-from app.models.refresh_token import RefreshToken  # noqa: F401
 from app.models.appointment import Appointment  # noqa: F401
+from app.models.contact import ContactInquiry  # noqa: F401
+from app.models.refresh_token import RefreshToken  # noqa: F401
+from app.models.setting import SiteSettings  # noqa: F401
+from app.models.user import User  # noqa: F401 - register table
+from sqlalchemy import create_engine
+from sqlmodel import SQLModel
 
 config = context.config
 if config.config_file_name is not None:

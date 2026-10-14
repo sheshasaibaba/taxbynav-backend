@@ -55,8 +55,6 @@ async def create_user(session: AsyncSession, data: UserCreate) -> User:
     return user
 
 
-
-
 def make_token_pair(user_id: int) -> tuple[str, str, int]:
     access = create_access_token(user_id)
     refresh = create_refresh_token(user_id)
@@ -76,9 +74,7 @@ def _naive_utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=None)
 
 
-async def store_refresh_token(
-    session: AsyncSession, user_id: int, refresh_token: str
-) -> None:
+async def store_refresh_token(session: AsyncSession, user_id: int, refresh_token: str) -> None:
     user_id_str, jti = decode_refresh_token(refresh_token)
     if not user_id_str or not jti:
         return

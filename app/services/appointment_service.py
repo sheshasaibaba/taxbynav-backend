@@ -4,6 +4,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.time_utils import to_naive_utc
 from app.models.appointment import Appointment, AppointmentCreate
 from app.models.user import User
 from app.services.slot_service import (
@@ -14,10 +15,7 @@ from app.services.slot_service import (
 
 
 def _to_naive_utc(dt: datetime) -> datetime:
-    """Convert to naive UTC for TIMESTAMP WITHOUT TIME ZONE columns."""
-    if dt.tzinfo is not None:
-        return dt.astimezone(UTC).replace(tzinfo=None)
-    return dt
+    return to_naive_utc(dt)
 
 
 async def create_appointment(
@@ -40,6 +38,9 @@ async def create_appointment(
         slot_start_utc=slot_start,
         message=data.message,
         contact_mode=data.contact_mode,
+        service_type=data.service_type,
+        phone_number=data.phone_number,
+        status="scheduled",
     )
     session.add(appointment)
     await session.flush()
@@ -54,6 +55,8 @@ async def create_appointment_for_email(
     guest_full_name: str | None = None,
     message: str | None = None,
     contact_mode: str | None = None,
+    service_type: str | None = None,
+    phone_number: str | None = None,
     user_if_exists: User | None = None,
 ) -> Appointment | None:
     """
@@ -77,6 +80,9 @@ async def create_appointment_for_email(
             slot_start_utc=slot_start,
             message=message,
             contact_mode=contact_mode,
+            service_type=service_type,
+            phone_number=phone_number,
+            status="scheduled",
         )
     else:
         count = await get_guest_appointment_count_on_date(session, email, d)
@@ -89,6 +95,9 @@ async def create_appointment_for_email(
             slot_start_utc=slot_start,
             message=message,
             contact_mode=contact_mode,
+            service_type=service_type,
+            phone_number=phone_number,
+            status="scheduled",
         )
     session.add(appointment)
     await session.flush()
@@ -96,12 +105,64 @@ async def create_appointment_for_email(
     return appointment
 
 
-async def link_guest_appointments_to_user(
-    session: AsyncSession, user_id: int, email: str
-) -> int:
-    """
-    Link all guest appointments with this email to the user. Returns count updated.
-    """
+async def reschedule_appointment(
+    session: AsyncSession,
+    appointment_id: int,
+    new_slot_start_utc: datetime,
+    user_id: int | None = None,
+    user_email: str | None = None,
+    is_admin: bool = False,
+) -> Appointment | None:
+    """Reschedule an existing appointment to a new slot."""
+    result = await session.execute(select(Appointment).where(Appointment.id == appointment_id))
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        return None
+
+    # Check permission
+    if not is_admin:
+        if appointment.user_id is not None:
+            if appointment.user_id != user_id:
+                return None
+        else:
+            if not user_email or (appointment.guest_email or "").lower() != user_email.lower():
+                return None
+
+    new_slot_utc = _to_naive_utc(new_slot_start_utc)
+    # Check if target slot is already booked by another appointment
+    booked = await get_booked_slot_starts(
+        session, new_slot_utc, new_slot_utc + timedelta(minutes=settings.slot_duration_minutes)
+    )
+    if booked:
+        return None
+
+    appointment.slot_start_utc = new_slot_utc
+    appointment.status = "rescheduled"
+    session.add(appointment)
+    await session.flush()
+    await session.refresh(appointment)
+    return appointment
+
+
+async def update_appointment_status(
+    session: AsyncSession,
+    appointment_id: int,
+    new_status: str,
+) -> Appointment | None:
+    """Admin updates appointment status (scheduled, completed, cancelled, no_show)."""
+    result = await session.execute(select(Appointment).where(Appointment.id == appointment_id))
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        return None
+    appointment.status = new_status
+    session.add(appointment)
+    await session.flush()
+    await session.refresh(appointment)
+    return appointment
+
+
+async def link_guest_appointments_to_user(session: AsyncSession, user_id: int, email: str) -> int:
+    """Link all guest appointments with this email to the user. Returns count updated."""
     email_lower = email.lower()
     stmt = (
         update(Appointment)
@@ -124,13 +185,17 @@ async def list_appointments_for_user(
 ) -> list[Appointment]:
     """Return appointments owned by user_id or guest bookings for user_email (case-insensitive)."""
     email_lower = user_email.lower()
-    q = select(Appointment).where(
-        (Appointment.user_id == user_id)
-        | (
-            (Appointment.user_id.is_(None))
-            & (func.lower(Appointment.guest_email) == email_lower)
+    q = (
+        select(Appointment)
+        .where(
+            (Appointment.user_id == user_id)
+            | (
+                (Appointment.user_id.is_(None))
+                & (func.lower(Appointment.guest_email) == email_lower)
+            )
         )
-    ).order_by(Appointment.slot_start_utc)
+        .order_by(Appointment.slot_start_utc.desc())
+    )
     if from_date:
         start = datetime(from_date.year, from_date.month, from_date.day, 0, 0, 0)
         q = q.where(Appointment.slot_start_utc >= start)
@@ -141,16 +206,22 @@ async def list_appointments_for_user(
 async def list_all_appointments_with_users(
     session: AsyncSession,
 ) -> list[tuple[Appointment, User | None]]:
-    """
-    Return all appointments with their user if any (left join so guest rows have User=None).
-    """
+    """Return all appointments with their user if any (left join so guest rows have User=None)."""
     q = (
         select(Appointment, User)
         .outerjoin(User, User.id == Appointment.user_id)
-        .order_by(Appointment.slot_start_utc)
+        .order_by(Appointment.slot_start_utc.desc())
     )
     result = await session.execute(q)
     return list(result.all())
+
+
+async def get_appointment_by_id(
+    session: AsyncSession,
+    appointment_id: int,
+) -> Appointment | None:
+    result = await session.execute(select(Appointment).where(Appointment.id == appointment_id))
+    return result.scalar_one_or_none()
 
 
 async def cancel_appointment(
@@ -158,35 +229,33 @@ async def cancel_appointment(
     appointment_id: int,
     user_id: int,
     user_email: str | None = None,
+    is_admin: bool = False,
 ) -> bool:
-    """Cancel if appointment is owned by user_id or by guest_email (when user_email provided)."""
-    result = await session.execute(
-        select(Appointment).where(Appointment.id == appointment_id)
-    )
+    """Mark appointment as cancelled (or delete). Cancelled frees the slot in slot_service."""
+    result = await session.execute(select(Appointment).where(Appointment.id == appointment_id))
     appointment = result.scalar_one_or_none()
     if not appointment:
         return False
-    if appointment.user_id is not None:
-        if appointment.user_id != user_id:
-            return False
-    else:
-        if not user_email or func.lower(appointment.guest_email or "") != user_email.lower():
-            return False
-    await session.delete(appointment)
+    if not is_admin:
+        if appointment.user_id is not None:
+            if appointment.user_id != user_id:
+                return False
+        else:
+            if not user_email or (appointment.guest_email or "").lower() != user_email.lower():
+                return False
+    appointment.status = "cancelled"
+    session.add(appointment)
     await session.flush()
     return True
 
 
 def _utc_naive_now() -> datetime:
-    """Naive UTC for comparison with TIMESTAMP WITHOUT TIME ZONE."""
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-async def delete_appointments_older_than(
-    session: AsyncSession, days: int
-) -> int:
-    """Delete appointments booked more than `days` ago (by created_at). Returns count deleted."""
+async def delete_appointments_older_than(session: AsyncSession, days: int) -> int:
+    """Delete appointments older than `days` ago (by slot_start_utc). Returns count deleted."""
     cutoff = _utc_naive_now() - timedelta(days=days)
-    result = await session.execute(delete(Appointment).where(Appointment.created_at < cutoff))
+    result = await session.execute(delete(Appointment).where(Appointment.slot_start_utc < cutoff))
     await session.flush()
     return result.rowcount or 0

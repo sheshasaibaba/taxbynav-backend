@@ -36,9 +36,7 @@ def create_refresh_token(subject: str | int) -> str:
 
 def decode_access_token(token: str) -> str | None:
     try:
-        payload = jwt.decode(
-            token, settings.secret_key, algorithms=[settings.algorithm]
-        )
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         if payload.get("type") != "access":
             return None
         sub = payload.get("sub")
@@ -50,9 +48,7 @@ def decode_access_token(token: str) -> str | None:
 def decode_refresh_token(token: str) -> tuple[str | None, str | None]:
     """Returns (user_id_str, jti) or (None, None)."""
     try:
-        payload = jwt.decode(
-            token, settings.secret_key, algorithms=[settings.algorithm]
-        )
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         if payload.get("type") != "refresh":
             return None, None
         return payload.get("sub"), payload.get("jti")

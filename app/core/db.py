@@ -14,7 +14,9 @@ query = parse_qs(parsed.query, keep_blank_values=True)
 query.pop("sslmode", None)
 query.pop("channel_binding", None)
 new_query = urlencode(query, doseq=True)
-async_database_url = urlunparse((scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
+async_database_url = urlunparse(
+    (scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment)
+)
 
 engine = create_async_engine(
     async_database_url,

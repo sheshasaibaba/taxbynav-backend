@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+
 from sqlmodel import Field, SQLModel
 
 
@@ -16,6 +17,11 @@ class Appointment(SQLModel, table=True):
     slot_start_utc: datetime = Field(unique=True, index=True)  # no overlapping slots
     message: str | None = None
     contact_mode: str | None = Field(default=None, max_length=50)
+    service_type: str | None = Field(default=None, max_length=100)
+    phone_number: str | None = Field(default=None, max_length=50)
+    status: str = Field(
+        default="scheduled", max_length=50
+    )  # scheduled, rescheduled, completed, cancelled, no_show
     created_at: datetime = Field(default_factory=_utc_naive_now)
 
 
@@ -23,6 +29,8 @@ class AppointmentCreate(SQLModel):
     slot_start_utc: datetime
     message: str | None = None
     contact_mode: str | None = None
+    service_type: str | None = None
+    phone_number: str | None = None
 
 
 class AppointmentPublic(SQLModel):
@@ -31,6 +39,9 @@ class AppointmentPublic(SQLModel):
     slot_start_utc: datetime
     message: str | None = None
     contact_mode: str | None = None
+    service_type: str | None = None
+    phone_number: str | None = None
+    status: str = "scheduled"
     created_at: datetime
 
 
@@ -42,4 +53,15 @@ class AppointmentAdminPublic(SQLModel):
     slot_start_utc: datetime
     message: str | None = None
     contact_mode: str | None = None
+    service_type: str | None = None
+    phone_number: str | None = None
+    status: str = "scheduled"
     created_at: datetime
+
+
+class AppointmentRescheduleRequest(SQLModel):
+    slot_start_utc: datetime
+
+
+class AppointmentStatusUpdateRequest(SQLModel):
+    status: str  # scheduled, completed, cancelled, no_show

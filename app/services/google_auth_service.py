@@ -27,6 +27,7 @@ def get_google_authorization_url(state: str | None = None, redirect_uri: str | N
     # State: if redirect_uri given, encode it so callback can redirect there with tokens
     if redirect_uri:
         import base64
+
         params["state"] = base64.urlsafe_b64encode(redirect_uri.encode()).decode().rstrip("=")
     elif state:
         params["state"] = state
@@ -74,9 +75,7 @@ async def get_google_user_info(access_token: str) -> dict | None:
         return resp.json()
 
 
-async def get_or_create_google_user(
-    session: AsyncSession, email: str, name: str | None
-) -> User:
+async def get_or_create_google_user(session: AsyncSession, email: str, name: str | None) -> User:
     result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if user:
