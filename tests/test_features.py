@@ -84,3 +84,60 @@ def test_dynamic_slot_generation_cst():
     # Sunday, Oct 18 2026 (weekday = 6, not in working days)
     d_sun = date(2026, 10, 18)
     assert len(_slot_times_for_date_cst(d_sun, settings)) == 0
+
+
+def test_native_bcrypt_hashing_and_truncation():
+    from app.core.security import hash_password, verify_password
+
+    # Regular password
+    pwd = "MySecretPassword@123"
+    h = hash_password(pwd)
+    assert verify_password(pwd, h) is True
+    assert verify_password("WrongPassword@123", h) is False
+
+    # Password > 72 bytes should not raise ValueError, should hash and verify properly
+    long_pwd = "A" * 80 + "1a!"
+    h_long = hash_password(long_pwd)
+    assert verify_password(long_pwd, h_long) is True
+    # Passwords sharing the first 72 bytes match (bcrypt standard)
+    assert verify_password(long_pwd[:72], h_long) is True
+
+
+def test_signup_schema_validation():
+    import pytest
+    from app.api.schemas.auth import SignupRequest
+    from pydantic import ValidationError
+
+    # Valid signup
+    req = SignupRequest(
+        email="ironman@mailinator.com",
+        password="Ironman@123",
+        name="Tony Stark",
+    )
+    assert req.email == "ironman@mailinator.com"
+    assert req.password == "Ironman@123"
+
+    # Password too short (< 8 chars)
+    with pytest.raises(ValidationError) as exc:
+        SignupRequest(email="valid@example.com", password="Ab1")
+    assert "at least 8 characters" in str(exc.value)
+
+    # Password missing lowercase
+    with pytest.raises(ValidationError) as exc:
+        SignupRequest(email="valid@example.com", password="PASSWORD123")
+    assert "lowercase" in str(exc.value)
+
+    # Password missing uppercase
+    with pytest.raises(ValidationError) as exc:
+        SignupRequest(email="valid@example.com", password="password123")
+    assert "uppercase" in str(exc.value)
+
+    # Password missing digit
+    with pytest.raises(ValidationError) as exc:
+        SignupRequest(email="valid@example.com", password="PasswordOnly")
+    assert "number" in str(exc.value)
+
+    # Invalid email
+    with pytest.raises(ValidationError):
+        SignupRequest(email="notanemail", password="ValidPassword123")
+

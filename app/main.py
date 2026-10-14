@@ -4,6 +4,7 @@ import os
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -105,16 +106,54 @@ def _cors_headers(origin: str | None) -> dict[str, str]:
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Refresh-Token",
     }
-    if origin and origin in settings.cors_origins_list:
-        headers["Access-Control-Allow-Origin"] = origin
-    elif settings.cors_origins_list:
+    if origin:
+        is_allowed = (
+            origin in settings.cors_origins_list
+            or origin.endswith("taxbynav.com")
+            or "localhost" in origin
+            or "127.0.0.1" in origin
+        )
+        if is_allowed:
+            headers["Access-Control-Allow-Origin"] = origin
+            return headers
+    if settings.cors_origins_list:
         headers["Access-Control-Allow-Origin"] = settings.cors_origins_list[0]
     return headers
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Format validation errors into clear, friendly sentences for end users."""
+    origin = request.headers.get("origin")
+    headers = _cors_headers(origin)
+
+    messages = []
+    for error in exc.errors():
+        msg = error.get("msg", "")
+        if msg.startswith("Value error, "):
+            msg = msg[len("Value error, "):]
+        loc = error.get("loc", ())
+        field = loc[-1] if loc else "field"
+
+        if field == "email":
+            messages.append("Please enter a valid email address.")
+        elif field == "password":
+            messages.append(msg if msg else "Please enter a valid password.")
+        else:
+            clean_field = str(field).replace("_", " ").capitalize()
+            messages.append(f"{clean_field}: {msg}")
+
+    detail = " ".join(messages) if messages else "Invalid input details provided. Please review and try again."
+    return JSONResponse(
+        status_code=422,
+        content={"detail": detail},
+        headers=headers,
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Return actual error in JSON; include CORS so 500 responses are not blocked by browser."""
+    """Handle unhandled exceptions cleanly without leaking internal Python syntax or tracebacks."""
     origin = request.headers.get("origin")
     headers = _cors_headers(origin)
     if isinstance(exc, HTTPException):
@@ -123,11 +162,14 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
             content={"detail": exc.detail},
             headers=headers,
         )
-    logger.exception("Unhandled exception: %s", exc)
-    detail = f"{type(exc).__name__}: {str(exc)}"
+
+    # Log full traceback internally for operations
+    logger.exception("Unhandled server exception: %s", exc)
+
+    # Return friendly, human message to client
     return JSONResponse(
         status_code=500,
-        content={"detail": detail},
+        content={"detail": "An unexpected error occurred while processing your request. Please try again or contact support."},
         headers=headers,
     )
 

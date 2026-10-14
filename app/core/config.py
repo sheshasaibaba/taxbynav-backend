@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
 
     # CORS
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,https://taxbynav.com,https://www.taxbynav.com"
 
     # Google OAuth
     google_client_id: str = ""

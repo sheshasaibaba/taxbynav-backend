@@ -87,7 +87,7 @@ async def store_refresh_token(session: AsyncSession, user_id: int, refresh_token
 async def login_user(
     session: AsyncSession, email: str, password: str
 ) -> tuple[User, str, str, int] | None:
-    user = await get_user_by_email(session, email)
+    user = await get_user_by_email_insensitive(session, email)
     if not user or not user.hashed_password:
         return None
     if not verify_password(password, user.hashed_password):
@@ -100,11 +100,12 @@ async def login_user(
 async def signup_user(
     session: AsyncSession, email: str, password: str, full_name: str | None = None
 ) -> tuple[User, str, str, int] | None:
-    existing = await get_user_by_email(session, email)
+    norm_email = email.strip().lower()
+    existing = await get_user_by_email_insensitive(session, norm_email)
     if existing:
         return None
     user = await create_user(
-        session, UserCreate(email=email, password=password, full_name=full_name)
+        session, UserCreate(email=norm_email, password=password, full_name=full_name)
     )
     await link_guest_appointments_to_user(session, user.id, user.email)
     access, refresh, expires_in = make_token_pair(user.id)

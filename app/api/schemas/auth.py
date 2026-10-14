@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr
+import re
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -8,9 +10,25 @@ class LoginRequest(BaseModel):
 
 class SignupRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=72,
+        description="Password must be between 8 and 72 characters",
+    )
     full_name: str | None = None
     name: str | None = None  # frontend sends "name"; prefer over full_name if both absent
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must include at least one lowercase letter")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must include at least one uppercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must include at least one number")
+        return v
 
 
 class TokenPair(BaseModel):
